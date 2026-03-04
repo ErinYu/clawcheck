@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clawcheck"
-version = "1.0.0"
+version = "1.0.1"
 description = "OpenClaw vulnerability scanner - Detect ClawJacked (CVE-2026-CLAW)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "ClawCheck Contributors" }
