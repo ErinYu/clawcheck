@@ -64,34 +64,59 @@ pip install -e .
 clawcheck
 ```
 
-Example output:
+#### Scan Flow
+
+```mermaid
+flowchart TD
+    A[clawcheck] --> B{OpenClaw Found?}
+    B -->|No| C[Exit Code: 3]
+    B -->|Yes| D{Version Vulnerable?}
+    D -->|Yes| E[VULNERABLE]
+    D -->|No| F[SECURE]
+    E --> G[Show Remediation]
+    F --> H[Exit Code: 0]
+    C --> I[Exit Code: 3]
+    G --> I
+
+    style E fill:#ff6b6b
+    style F fill:#51cf66
+    style C fill:#ffd93d
 ```
-✗ VULNERABLE: 1 vulnerability(ies) found
 
-┏━━━━━━━━━━━━━━━━ Target Information ━━━━━━━━━━━━━━━━┓
-┃                                                      ┃
-┃ OpenClaw Version    2026.2.12                       ┃
-┃ Gateway Status      Running                         ┃
-┃ Config Path         /Users/user/.openclaw/...         ┃
-┃ Instance Type       local                           ┃
-┃                                                      ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+#### Output Example
 
-┏━━━━━━━━━━ CLAWJACKED ━━━━━━━━━━━━ VULNERABLE ━━━━━━━━━━━┓
-┃ WebSocket hijacking via localhost origin bypass         ┃
-┃                                                              ┃
-┃  Indicator             Status                            ┃
-┃  ──────────             ──────                            ┃
-┃  Version Check         VULNERABLE                        ┃
-┃  Origin Validation     FAIL                              ┃
-┃  Rate Limiting         FAIL                              ┃
-┃  Trust Registration    FAIL                              ┃
-┃                                                              ┃
-┃  Auto-fix: openclaw upgrade                                ┃
-┃  Manual steps:                                              ┃
-┃    • Update to OpenClaw 2026.2.25 or later               ┃
-┃    • Verify gateway configuration...                       ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+```mermaid
+graph LR
+    subgraph Target
+        A[OpenClaw Version: 2026.2.12]
+        B[Gateway: Running]
+        C[Instance: Local]
+    end
+
+    subgraph ClawJacked
+        D[VULNERABLE]
+        E[Version Check: FAIL]
+        F[Origin Validation: FAIL]
+        G[Rate Limiting: FAIL]
+    end
+
+    subgraph Remediation
+        H[openclaw upgrade]
+    end
+
+    A --> D
+    B --> D
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+
+    style D fill:#ff6b6b
+    style E fill:#ff6b6b
+    style F fill:#ff6b6b
+    style G fill:#ff6b6b
+    style H fill:#51cf66
 ```
 
 ### JSON Output
@@ -155,6 +180,27 @@ clawcheck -vv --json --output scan.json --timeout 60
 
 ## Exit Codes
 
+```mermaid
+flowchart TD
+    Start[clawcheck scan] --> Check{OpenClaw Found?}
+    Check -->|No| NotFound[Exit Code: 3]
+    Check -->|Yes| Scan{Scan Success?}
+    Scan -->|Error| Error[Exit Code: 2]
+    Scan -->|Success| Vulnerable{Vulnerabilities Found?}
+    Vulnerable -->|Yes| VulnExit[Exit Code: 1]
+    Vulnerable -->|No| Secure[Exit Code: 0]
+
+    NotFound --> End[End]
+    Error --> End
+    VulnExit --> End
+    Secure --> End
+
+    style NotFound fill:#ffd93d
+    style Error fill:#ff6b6b
+    style VulnExit fill:#ff6b6b
+    style Secure fill:#51cf66
+```
+
 | Code | Meaning | Use Case |
 |------|---------|----------|
 | 0 | SECURE | No vulnerabilities found |
@@ -187,11 +233,71 @@ exit $EXIT_CODE
 **Severity:** HIGH
 **Affected Versions:** OpenClaw `< 2026.2.25`
 
-**Attack Vector:**
+#### Attack Chain
 
-1. **WebSocket Origin Bypass** - Malicious JavaScript can connect to `localhost:18789` without CORS restrictions
-2. **No Localhost Rate Limiting** - Brute-force attacks at hundreds of attempts per second
-3. **Automatic Trust Registration** - Successful auth from localhost auto-approves device pairing
+```mermaid
+sequenceDiagram
+    participant Victim as 🧑
+    participant Website as 🌐
+    participant Browser as 🌍
+    participant OpenClaw as 🤖
+    participant Attacker as 👾
+
+    Note over Victim,Attacker: User visits malicious website
+    Victim->>Website: Visits URL
+    Website->>Browser: Injects malicious JS
+
+    Note over Browser,OpenClaw: Step 1: WebSocket Origin Bypass
+    Browser->>OpenClaw: WebSocket to localhost:18789
+    Note right of OpenClaw: No CORS restriction!
+    OpenClaw-->>Browser: Connection accepted
+
+    Note over Browser,OpenClaw: Step 2: No Rate Limiting
+    loop Brute Force (hundreds/sec)
+        Browser->>OpenClaw: Auth attempt
+        OpenClaw-->>Browser: Rejected
+    end
+
+    Note over Browser,OpenClaw: Step 3: Auto-Trust Registration
+    Browser->>OpenClaw: Successful auth
+    OpenClaw-->>Browser: Device auto-approved!
+
+    Note over OpenClaw,Attacker: Step 4: Full Control
+    Attacker->>OpenClaw: Send messages, read logs
+    OpenClaw-->>Attacker: Exfiltrate data
+
+    Note over Victim,Attacker: Workstation compromised!
+```
+
+#### Vulnerability Components
+
+```mermaid
+graph TB
+    subgraph ClawJacked Vulnerability
+        A[WebSocket Origin Bypass]
+        B[No Localhost Rate Limiting]
+        C[Auto Trust Registration]
+    end
+
+    subgraph Attack Consequences
+        D[Full Workstation Compromise]
+        E[Data Exfiltration]
+        F[Privacy Violation]
+    end
+
+    A --> D
+    B --> D
+    C --> D
+    D --> E
+    D --> F
+
+    style A fill:#ff6b6b
+    style B fill:#ff6b6b
+    style C fill:#ff6b6b
+    style D fill:#c92a2a
+    style E fill:#c92a2a
+    style F fill:#c92a2a
+```
 
 **Impact:** Full workstation compromise initiated from a browser tab
 
@@ -209,6 +315,62 @@ exit $EXIT_CODE
 
 ## Development
 
+### Architecture
+
+```mermaid
+flowchart TD
+    subgraph CLI
+        A[User]
+        B[clawcheck command]
+    end
+
+    subgraph Discovery
+        C[Config Scanner]
+        D[CLI Runner]
+        E[Port Prober]
+    end
+
+    subgraph Scan
+        F[Vulnerability DB]
+        G[Version Checker]
+        H[WebSocket Probe]
+    end
+
+    subgraph Output
+        I[Terminal Formatter]
+        J[JSON Formatter]
+        K[SARIF Formatter]
+    end
+
+    subgraph Fix
+        L[Backup Manager]
+        M[Update Executor]
+        N[Verification]
+    end
+
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    C --> G
+    D --> G
+    G --> F
+    F --> H
+    H --> I
+    H --> J
+    H --> K
+
+    B --> L
+    L --> M
+    M --> N
+
+    style A fill:#e3f2fd
+    style B fill:#bbdefb
+    style I fill:#90caf9
+    style J fill:#90caf9
+    style K fill:#90caf9
+```
+
 ### Running Tests
 
 ```bash
@@ -224,23 +386,47 @@ pytest --cov=clawcheck --cov-report=html
 
 ### Project Structure
 
+```mermaid
+graph TD
+    Root[clawcheck/]
+
+    Root --> Src[src/]
+    Root --> Tests[tests/]
+    Root --> Docs[docs/]
+    Root --> Config[pyproject.toml, README.md, LICENSE]
+
+    Src --> Package[clawcheck/]
+    Package --> Init[__init__.py]
+    Package --> CLI[cli.py - Click CLI interface]
+    Package --> Discovery[discovery.py - OpenClaw discovery]
+    Package --> Models[models.py - Data models]
+    Package --> Output[output.py - Output formatters]
+    Package --> Probe[probe.py - WebSocket probe]
+    Package --> VulnDB[vuln_db.py - Vulnerability database]
+
+    Tests --> Unit[unit/ - Unit tests]
+    Tests --> Integration[integration/ - Integration tests]
+
+    Docs --> Plans[plans/ - Implementation plans]
+
+    style Root fill:#e3f2fd
+    style Src fill:#bbdefb
+    style Tests fill:#bbdefb
+    style Docs fill:#bbdefb
+    style Config fill:#bbdefb
+    style Package fill:#90caf9
 ```
-clawcheck/
-├── src/clawcheck/
-│   ├── __init__.py
-│   ├── cli.py           # Click CLI interface
-│   ├── discovery.py     # OpenClaw discovery
-│   ├── models.py        # Data models
-│   ├── output.py        # Output formatters
-│   ├── probe.py         # WebSocket vulnerability probe
-│   └── vuln_db.py       # Vulnerability database
-├── tests/
-│   ├── unit/            # Unit tests
-│   └── integration/     # Integration tests
-├── docs/                # Documentation
-├── pyproject.toml
-└── README.md
-```
+
+**File Overview:**
+
+| Module | Purpose |
+|--------|---------|
+| `cli.py` | Click CLI interface (scan/fix/monitor commands) |
+| `discovery.py` | OpenClaw discovery (config, CLI, port probing) |
+| `models.py` | Data models (ScanResult, Finding, ExitCode, etc.) |
+| `output.py` | Terminal/JSON/SARIF formatters |
+| `probe.py` | WebSocket vulnerability probe |
+| `vuln_db.py` | Vulnerability database with version checking |
 
 ## Contributing
 
